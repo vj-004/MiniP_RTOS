@@ -8,25 +8,31 @@ enum class TaskState {
     TERMINATED
 };
 
+const int maxTicks = 3;
+
 struct TCB {
     int id;
+    std::string name;
     int priority;
     TaskState state;
     int delayTicks;
     int timeSlice;
-    std::function<void()> taskFunction;
+    int ticksRemaining;
+    int burstTime;
+    std::function<void(void*)> taskFunction;
+    int burstTime;
+    void* taskArgs;
 
-    // Default Constructor
     TCB()
-    : id(0), priority(0), state(TaskState::READY),
-        delayTicks(0), timeSlice(0), taskFunction(nullptr) {}
+        : id(0), name(""), priority(0), state(TaskState::READY),
+          delayTicks(0), timeSlice(maxTicks), ticksRemaining(maxTicks),
+          taskFunction(nullptr), taskArgs(nullptr) {}
 
-    // Constructor sets defaults automatically
-    TCB(int tid, int pri, std::function<void()> func, int ts = 0)
-        : id(tid),
-          priority(pri),
-          state(TaskState::READY),  // READY by default
-          delayTicks(0),
-          timeSlice(ts),            // Default time slice = 0
-          taskFunction(func) {}
+    TCB(int tid, std::string tname, int pri,
+        std::function<void(void*)> func,
+        void* args = nullptr, int ts = maxTicks)
+        : id(tid), name(std::move(tname)), priority(pri),
+          state(TaskState::READY), delayTicks(0),
+          timeSlice(ts), ticksRemaining(ts),
+          taskFunction(func), taskArgs(args) {}
 };
