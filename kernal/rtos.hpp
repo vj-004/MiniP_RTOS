@@ -1,13 +1,17 @@
 #pragma once
 #include "../task/task.hpp"
 #include <vector>
+#include <map>
+#include <queue>
 
 class RTOS {
 
 private:
 
     std::vector<TCB> tasks;
-    int currentTask;
+    std::map<int,TCB> task;
+    std::map<int,std::queue<int>> task_queues;
+    int currentTaskId;
     int tick;
     int quantum;
 

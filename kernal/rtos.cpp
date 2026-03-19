@@ -5,8 +5,7 @@
 #include <chrono>
 
 RTOS::RTOS() {
-
-    currentTask = -1;
+    currentTaskId = -1;
     tick = 0;
     quantum = 3;
 }
@@ -26,7 +25,9 @@ void RTOS::createTask(
     t.timeSlice = quantum;
     t.taskFunction = func;
 
-    tasks.push_back(t);
+    task[id] = t;
+    task_queues[priority].push(id);
+
 }
 
 void RTOS::systemTick() {
@@ -35,64 +36,49 @@ void RTOS::systemTick() {
 
     std::cout << "\n[TICK " << tick << "]\n";
 
+    // what is this function doing?
     updateDelays();
 
-    if (currentTask != -1)
-        tasks[currentTask].timeSlice--;
+    if (currentTaskId != -1)
+        task[currentTaskId].timeSlice--;
     
 
-    if(currentTask != -1){
-        if(tasks[currentTask].timeSlice == 0){
-            tasks[currentTask].state = TaskState::TERMINATED;
-            currentTask = -1;
+    if(currentTaskId != -1){
+        if(task[currentTaskId].timeSlice == 0){
+            task[currentTaskId].state = TaskState::TERMINATED;
+            currentTaskId = -1;
         }
     }
 
     schedule();
 
-    if (currentTask != -1)
-        tasks[currentTask].taskFunction();
+    if (currentTaskId != -1)
+        task[currentTaskId].taskFunction();
 }
 
 void RTOS::schedule() {
 
 
-    if (currentTask == -1 ||
-        tasks[currentTask].timeSlice <= 0) {
-
-        std::set<int> taskIds =
-            Scheduler::prioritySchedule(tasks);
-        
-        std:: cout << std:: endl;
-
-        std::vector<TCB> rrTasks;
-        
-        for(auto task: tasks){
-            if(taskIds.find(task.id) != taskIds.end()){
-                rrTasks.push_back(task);
-            }
-        }
-        
+    if (currentTaskId == -1 ||
+        tasks[currentTaskId].timeSlice <= 0) {
+            
         int next = -1;
-        if (taskIds.size() > 0){
-            int identity =  
-                Scheduler::roundRobinSchedule(
-                    rrTasks,
-                    currentTask
-                );
-                
-            if(identity != -1){
-                int n = tasks.size();
-                for(int i=0;i<n;i++){
-                    if(tasks[i].id == identity){
-                        next = i;
-                        break;
-                    }
-                }
-            }  
-        }
         
-        // std::cout << "next is: " << next << '\n';
+        while(task_queues.size() > 0){
+            int maxPriority = task_queues.rbegin()->first;
+            next = task_queues[maxPriority].front();
+            while(task_queues[maxPriority].size() > 0 && task[next].state == TaskState::TERMINATED){
+                task_queues[maxPriority].pop();         
+                next = task_queues[maxPriority].front();       
+            }
+            if(task_queues[maxPriority].size() == 0){
+                task_queues.erase(maxPriority);
+            }
+
+        }    
+        
+        
+        
 
         if (next != -1)
             contextSwitch(next);
@@ -101,34 +87,34 @@ void RTOS::schedule() {
 
 void RTOS::contextSwitch(int nextTask) {
 
-    if (currentTask != -1 &&
-        tasks[currentTask].state ==
+    if (currentTaskId != -1 &&
+        tasks[currentTaskId].state ==
         TaskState::RUNNING) {
 
-        tasks[currentTask].state = TaskState::READY;
+        tasks[currentTaskId].state = TaskState::READY;
     }
 
-    currentTask = nextTask;
+    currentTaskId = nextTask;
 
-    tasks[currentTask].state = TaskState::RUNNING;
+    tasks[currentTaskId].state = TaskState::RUNNING;
 
-    tasks[currentTask].timeSlice = quantum;
+    tasks[currentTaskId].timeSlice = quantum;
 
     std::cout << "Context Switch -> Task "
-              << tasks[currentTask].id
+              << tasks[currentTaskId].id
               << std::endl;
 }
 
 void RTOS::updateDelays() {
 
-    for (auto &t : tasks) {
+    for (auto &t : task) {
 
-        if (t.state == TaskState::BLOCKED) {
+        if (t.second.state == TaskState::BLOCKED) {
 
-            t.delayTicks--;
+            t.second.delayTicks--;
 
-            if (t.delayTicks <= 0)
-                t.state = TaskState::READY;
+            if (t.second.delayTicks <= 0)
+                t.second.state = TaskState::READY;
         }
     }
 }
